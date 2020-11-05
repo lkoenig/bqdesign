@@ -13,14 +13,20 @@ from biquad_design import BIQUAD_DESIGN_LIBRARY
 logging.basicConfig()
 
 SAMPLERATE = 48000
-NPOINTS = 4096
+NPOINTS = 8192
+
+class FilterParameter(pTypes.GroupParameter):
+    coefficients_changed = QtCore.Signal()
+    def __init__(self, **opts):
+        super().__init__(**opts)
 
 
-class DigitalFilterParameter(pTypes.GroupParameter):
+
+class DigitalFilterParameter(FilterParameter):
     def __init__(self, **opts):
         opts['type'] = 'bool'
         opts['value'] = True
-        pTypes.GroupParameter.__init__(self, **opts)
+        super().__init__(**opts)
 
         self.addChild(
             {
@@ -36,23 +42,24 @@ class DigitalFilterParameter(pTypes.GroupParameter):
                 'value': '1.0, 0.0, 0.0',
                 'siPrefix': False
             })
-
         self.numerator = self.param('numerator')
         self.denominator = self.param('denominator')
         self.numerator.sigValueChanged.connect(self.design_filter)
         self.denominator.sigValueChanged.connect(self.design_filter)
+        
 
     def design_filter(self):
         self.a = np.fromstring(self.denominator.value(), dtype=np.float64)
         self.b = np.fromstring(self.numerator.value(), dtype=np.float64)
-        self.sos = signal.tf2sos(b, a)
+        self.sos = signal.tf2sos(self.b, self.a)
+        self.coefficients_changed.emit()
 
 
-class BiquadParameter(pTypes.GroupParameter):
+class BiquadParameter(FilterParameter):
     def __init__(self, **opts):
         opts['type'] = 'bool'
         opts['value'] = True
-        pTypes.GroupParameter.__init__(self, **opts)
+        super().__init__(**opts)
 
         self.addChild(
             {
@@ -146,9 +153,10 @@ class BiquadParameter(pTypes.GroupParameter):
         assert len(self.b) == 3
 
         self.sos = signal.tf2sos(self.b, self.a)
+        self.coefficients_changed.emit()
 
 
-class FilterCascadeParameter(pTypes.GroupParameter):
+class FilterCascadeParameter(FilterParameter):
     def __init__(self, **opts):
         opts['type'] = 'group'
         opts['addText'] = "Add"
@@ -159,12 +167,20 @@ class FilterCascadeParameter(pTypes.GroupParameter):
         }
 
         # opts['addList'] = list(self.filter_types.keys())
-        pTypes.GroupParameter.__init__(self, **opts)
+        super().__init__(**opts)
+        for child in self.children():
+            if isinstance(child, FilterParameter):
+                child.coefficients_changed.connect(self.update_fiter)
 
     def addNew(self, filter_type="Biquad"):
         filter_type_cls = self.filter_types[filter_type]
-        self.addChild(filter_type_cls(name="%s %d" % (filter_type,
+        child = self.addChild(filter_type_cls(name="%s %d" % (filter_type,
                                                       len(self.childs)+1), removable=True, renamable=True))
+        if isinstance(child, FilterParameter):
+            child.coefficients_changed.connect(self.update_fiter)
+    
+    def update_fiter(self):
+        self.coefficients_changed.emit()
 
 
 class BiquadDesigner(QtGui.QWidget):
@@ -188,10 +204,10 @@ class BiquadDesigner(QtGui.QWidget):
         self.plot.showGrid(x=True, y=True)
         self.plot.addLegend()
 
-        self.pulsations = np.linspace(20 * 2/SAMPLERATE, 1, NPOINTS)
-        magnitude = np.ones(self.pulsations.shape)
+        self.normalized_frequencies = np.linspace(1/NPOINTS, 0.5, NPOINTS)
+        magnitude = np.ones(self.normalized_frequencies.shape)
         self.total_response_magnitude = self.plot.plot(
-            x=self.pulsations*SAMPLERATE, y=magnitude, name="Total", pen=self.get_next_pen())
+            x=self.normalized_frequencies*SAMPLERATE, y=magnitude, name="Total", pen=self.get_next_pen())
 
         toolbar = QtGui.QToolBar("Main toolbar")
         load_data_button = QtGui.QAction("Load data", self)
@@ -212,7 +228,7 @@ class BiquadDesigner(QtGui.QWidget):
         self.update_frequency_response()
         self.resize(800, 800)
         self.show()
-        self.filter_parameters.sigTreeStateChanged.connect(
+        self.filter_parameters.coefficients_changed.connect(
             self.update_frequency_response)
 
     def get_next_pen(self):
@@ -223,10 +239,10 @@ class BiquadDesigner(QtGui.QWidget):
 
     def update_frequency_response(self):
         self.sos = self.get_second_order_sections()
-        _, h = signal.sosfreqz(self.sos, self.pulsations)
+        w, h = signal.sosfreqz(self.sos, self.normalized_frequencies * np.pi * 2)
         magnitude = np.abs(h)
         self.total_response_magnitude.setData(
-            x=self.pulsations*SAMPLERATE / 2, y=magnitude)
+            x=self.normalized_frequencies * SAMPLERATE, y=magnitude)
 
     def get_second_order_sections(self):
         sos = []
