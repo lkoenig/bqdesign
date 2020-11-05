@@ -96,7 +96,6 @@ class DigitalFilterParameter(FilterParameter):
         self.denominator = self.param('denominator')
         self.numerator.sigValueChanged.connect(self.design_filter)
         self.denominator.sigValueChanged.connect(self.design_filter)
-        
 
     def design_filter(self):
         self.a = np.fromstring(self.denominator.value(), dtype=np.float64)
@@ -229,7 +228,7 @@ class FilterCascadeParameter(FilterParameter):
                                                               len(self.childs)+1), removable=True, renamable=True))
         if isinstance(child, FilterParameter):
             child.coefficients_changed.connect(self.update_fiter)
-    
+
     def update_fiter(self):
         self.coefficients_changed.emit()
 
@@ -237,8 +236,12 @@ class FilterCascadeParameter(FilterParameter):
 class BiquadDesigner(QtGui.QWidget):
     def __init__(self):
         super().__init__()
-        self._colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+        self._colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728',
+                        '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
         self._color_index = 0
+
+        self.last_folder = os.getcwd()
+
         self.filter_parameters = FilterCascadeParameter(name='Filter Cascade', children=[
             BiquadParameter(name="Biquad 1", removable=True, renamable=True)])
 
@@ -287,10 +290,10 @@ class BiquadDesigner(QtGui.QWidget):
         self._color_index = (self._color_index + 1) % len(self._colors)
         return pyqtgraph.mkPen(c)
 
-
     def update_frequency_response(self):
         self.sos = self.get_second_order_sections()
-        w, h = signal.sosfreqz(self.sos, self.normalized_frequencies * np.pi * 2)
+        w, h = signal.sosfreqz(
+            self.sos, self.normalized_frequencies * np.pi * 2)
         magnitude = np.abs(h)
         self.total_response_magnitude.setData(
             x=self.normalized_frequencies * SAMPLERATE, y=magnitude)
@@ -304,9 +307,13 @@ class BiquadDesigner(QtGui.QWidget):
             sos = [[1, 0, 0, 1, 0, 0]]
         return np.vstack(sos)
 
+    def update_last_folder(self, filename):
+        self.last_folder = os.path.dirname(filename)
+
     def load_data_triggered(self):
         data_filename, file_type = QtGui.QFileDialog.getOpenFileName(self, 'Open file',
-                                                                     os.getcwd(), "Data files (*.csv *.txt)")
+                                                                     self.last_folder, "Data files (*.csv *.txt)")
+        self.update_last_folder(data_filename)
         data = np.loadtxt(data_filename)
         if data.shape[1] == 2:
             self.plot.plot(x=data[:, 0], y=data[:, 1],
@@ -328,7 +335,8 @@ class BiquadDesigner(QtGui.QWidget):
             "Textproto (*.textproto)": textproto_sos_save,
         }
         sos_filename, file_type = QtGui.QFileDialog.getSaveFileName(self, 'Save file',
-                                                                    os.getcwd(), ';;'.join(filters.keys()))
+                                                                    self.last_folder, ';;'.join(filters.keys()))
+        self.update_last_folder(sos_filename)
         if sos_filename == "":
             return
         sos = self.get_second_order_sections()
