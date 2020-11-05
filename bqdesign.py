@@ -15,11 +15,61 @@ logging.basicConfig()
 SAMPLERATE = 48000
 NPOINTS = 8192
 
+
 class FilterParameter(pTypes.GroupParameter):
     coefficients_changed = QtCore.Signal()
+
     def __init__(self, **opts):
         super().__init__(**opts)
 
+
+class InductanceFilterParameter(FilterParameter):
+    def __init__(self, **opts):
+        opts['type'] = 'bool'
+        opts['value'] = True
+        super().__init__(**opts)
+
+        self.addChild(
+            {
+                'name': 'R',
+                'type': 'float',
+                'value': 1.0,
+                'suffix': 'Ohm',
+                'siPrefix': False,
+            })
+        self.addChild(
+            {
+                'name': 'L',
+                'type': 'float',
+                'value': 0.0,
+                'suffix': 'H',
+                'siPrefix': False,
+            })
+        self.addChild(
+            {
+                'name': 'Rleak',
+                'type': 'float',
+                'value': 20,
+                'suffix': 'Ohm',
+                'siPrefix': False,
+            })
+        self.R = self.param('R')
+        self.L = self.param('L')
+        self.Rleak = self.param('Rleak')
+        self.R.sigValueChanged.connect(self.design_filter)
+        self.L.sigValueChanged.connect(self.design_filter)
+        self.Rleak.sigValueChanged.connect(self.design_filter)
+
+    def design_filter(self):
+        R = self.R.value()
+        Rleak = self.Rleak.value()
+        L = self.L.value()
+        Zs = signal.lti([(R + Rleak) * L, R * Rleak], [L, Rleak])
+        Zd = Zs.to_discrete(1 / SAMPLERATE)
+        self.b = Zd.num
+        self.a = Zd.den
+        self.sos = signal.tf2sos(self.b, self.a)
+        self.coefficients_changed.emit()
 
 
 class DigitalFilterParameter(FilterParameter):
@@ -163,10 +213,11 @@ class FilterCascadeParameter(FilterParameter):
 
         self.filter_types = {
             "Biquad": BiquadParameter,
-            "Custom": DigitalFilterParameter,
+            "Inductance": InductanceFilterParameter,
+            # "Custom": DigitalFilterParameter,
         }
 
-        # opts['addList'] = list(self.filter_types.keys())
+        opts['addList'] = list(self.filter_types.keys())
         super().__init__(**opts)
         for child in self.children():
             if isinstance(child, FilterParameter):
@@ -175,7 +226,7 @@ class FilterCascadeParameter(FilterParameter):
     def addNew(self, filter_type="Biquad"):
         filter_type_cls = self.filter_types[filter_type]
         child = self.addChild(filter_type_cls(name="%s %d" % (filter_type,
-                                                      len(self.childs)+1), removable=True, renamable=True))
+                                                              len(self.childs)+1), removable=True, renamable=True))
         if isinstance(child, FilterParameter):
             child.coefficients_changed.connect(self.update_fiter)
     
