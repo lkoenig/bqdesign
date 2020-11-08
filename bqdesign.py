@@ -8,9 +8,10 @@ import logging
 import sys
 from scipy import signal
 import os
+import pickle
+
 from biquad_design import BIQUAD_DESIGN_LIBRARY
 
-logging.basicConfig()
 
 SAMPLERATE = 48000
 NPOINTS = 8192
@@ -247,7 +248,7 @@ class BiquadDesigner(QtGui.QMainWindow):
 
         self.parameter_tree = ParameterTree()
         self.parameter_tree.setParameters(self.filter_parameters, showTop=True)
-        
+
         self.plot_widget = pyqtgraph.PlotWidget()
         self.plot = self.plot_widget.getPlotItem()
         self.plot.setTitle("Magnitude response")
@@ -261,22 +262,12 @@ class BiquadDesigner(QtGui.QMainWindow):
         self.total_response_magnitude = self.plot.plot(
             x=self.normalized_frequencies*SAMPLERATE, y=magnitude, name="Total", pen=self.get_next_pen())
 
-        toolbar = QtGui.QToolBar("Main toolbar")
-        load_data_button = QtGui.QAction("Load data", self)
-        load_data_button.triggered.connect(self.load_data_triggered)
-        toolbar.addAction(load_data_button)
-
-        save_button = QtGui.QAction("Save", self)
-        save_button.triggered.connect(self.save_sos_coefficients)
-        toolbar.addAction(save_button)
-
-        refresh_button = QtGui.QAction("Refresh", self)
-        refresh_button.triggered.connect(self.update_frequency_response)
-        toolbar.addAction(refresh_button)
+        toolbar = self.get_main_toolbar()
 
         self.addToolBar(toolbar)
 
         parameters_dock = QtGui.QDockWidget("Parameters", parent=self)
+        parameters_dock.setFeatures(QtGui.QDockWidget.DockWidgetMovable | QtGui.QDockWidget.DockWidgetFloatable)
         parameters_dock.setWidget(self.parameter_tree)
 
         self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, parameters_dock)
@@ -286,6 +277,30 @@ class BiquadDesigner(QtGui.QMainWindow):
         self.show()
         self.filter_parameters.coefficients_changed.connect(
             self.update_frequency_response)
+
+    def get_main_toolbar(self):
+        toolbar = QtGui.QToolBar("Main toolbar")
+
+        open_button = QtGui.QAction("Open", self)
+        open_button.triggered.connect(self.reload_state)
+        toolbar.addAction(open_button)
+
+        save_button = QtGui.QAction("Save", self)
+        save_button.triggered.connect(self.save_state)
+        toolbar.addAction(save_button)
+
+        load_data_button = QtGui.QAction("Load data", self)
+        load_data_button.triggered.connect(self.load_data_triggered)
+        toolbar.addAction(load_data_button)
+
+        save_button = QtGui.QAction("Save SOS", self)
+        save_button.triggered.connect(self.save_sos_coefficients)
+        toolbar.addAction(save_button)
+
+        refresh_button = QtGui.QAction("Refresh", self)
+        refresh_button.triggered.connect(self.update_frequency_response)
+        toolbar.addAction(refresh_button)
+        return toolbar
 
     def get_next_pen(self):
         c = self._colors[self._color_index]
@@ -315,6 +330,8 @@ class BiquadDesigner(QtGui.QMainWindow):
     def load_data_triggered(self):
         data_filename, file_type = QtGui.QFileDialog.getOpenFileName(self, 'Open file',
                                                                      self.last_folder, "Data files (*.csv *.txt)")
+        if data_filename == "":
+            return
         self.update_last_folder(data_filename)
         data = np.loadtxt(data_filename)
         if data.shape[1] == 2:
@@ -336,7 +353,7 @@ class BiquadDesigner(QtGui.QMainWindow):
                                                                     header="# Second order secions coefficients"),
             "Textproto (*.textproto)": textproto_sos_save,
         }
-        sos_filename, file_type = QtGui.QFileDialog.getSaveFileName(self, 'Save file',
+        sos_filename, file_type = QtGui.QFileDialog.getSaveFileName(self, 'Save SOS',
                                                                     self.last_folder, ';;'.join(filters.keys()))
         self.update_last_folder(sos_filename)
         if sos_filename == "":
@@ -345,12 +362,18 @@ class BiquadDesigner(QtGui.QMainWindow):
         save_method = filters[file_type]
         save_method(sos_filename, sos)
 
+    def save_state(self):
+        logging.warning('Not yet implemented')
 
-app = QtGui.QApplication(sys.argv)
-ex = BiquadDesigner()
-sys.exit(app.exec_())
+    def reload_state(self):
+        logging.warning('Not yet implemented')
+
 
 if __name__ == '__main__':
+    logging.basicConfig()
+    app = QtGui.QApplication(sys.argv)
+    ex = BiquadDesigner()
+    sys.exit(app.exec_())
     import sys
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
         QtGui.QApplication.instance().exec_()
