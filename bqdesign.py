@@ -233,7 +233,7 @@ class FilterCascadeParameter(FilterParameter):
         self.coefficients_changed.emit()
 
 
-class BiquadDesigner(QtGui.QWidget):
+class BiquadDesigner(QtGui.QMainWindow):
     def __init__(self):
         super().__init__()
         self._colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728',
@@ -247,9 +247,7 @@ class BiquadDesigner(QtGui.QWidget):
 
         self.parameter_tree = ParameterTree()
         self.parameter_tree.setParameters(self.filter_parameters, showTop=True)
-        layout = QtGui.QGridLayout()
-        self.setLayout(layout)
-
+        
         self.plot_widget = pyqtgraph.PlotWidget()
         self.plot = self.plot_widget.getPlotItem()
         self.plot.setTitle("Magnitude response")
@@ -276,9 +274,13 @@ class BiquadDesigner(QtGui.QWidget):
         refresh_button.triggered.connect(self.update_frequency_response)
         toolbar.addAction(refresh_button)
 
-        layout.addWidget(toolbar)
-        layout.addWidget(self.parameter_tree)
-        layout.addWidget(self.plot_widget)
+        self.addToolBar(toolbar)
+
+        parameters_dock = QtGui.QDockWidget("Parameters", parent=self)
+        parameters_dock.setWidget(self.parameter_tree)
+
+        self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, parameters_dock)
+        self.setCentralWidget(self.plot_widget)
         self.update_frequency_response()
         self.resize(800, 800)
         self.show()
