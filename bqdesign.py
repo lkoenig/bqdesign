@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
+
+import logging
+import sys
+import os
+
+from PySide2 import QtWidgets
+import numpy as np
+
 from pyqtgraph.parametertree import Parameter, ParameterTree, ParameterItem, registerParameterType
 import pyqtgraph.parametertree.parameterTypes as pTypes
 import pyqtgraph
 from pyqtgraph.Qt import QtCore, QtGui
-import numpy as np
-import logging
-import sys
 from scipy import signal
-import os
-import pickle
 
 from biquad_design import BIQUAD_DESIGN_LIBRARY
 
@@ -193,8 +196,8 @@ class BiquadParameter(FilterParameter):
 
         # if the filter design results in a numerator and denominator that are equal, then just implement the passthrough filter
         if np.array_equal(b_coefficients, a_coefficients):
-            bCoeff = np.array([1., 0., 0.])
-            aCoeff = np.array([1., 0., 0.])
+            b_coefficients = np.array([1., 0., 0.])
+            a_coefficients = np.array([1., 0., 0.])
 
         self.a = np.array(a_coefficients) / a_coefficients[0]
         self.b = np.array(b_coefficients) / a_coefficients[0]
@@ -266,10 +269,10 @@ class BiquadDesigner(QtGui.QMainWindow):
 
         self.addToolBar(toolbar)
 
-        parameters_dock = QtGui.QDockWidget("Parameters", parent=self)
-        parameters_dock.setFeatures(QtGui.QDockWidget.DockWidgetMovable | QtGui.QDockWidget.DockWidgetFloatable)
+        parameters_dock = QtWidgets.QDockWidget("Parameters", parent=self)
+        parameters_dock.setFeatures(
+            QtWidgets.QDockWidget.DockWidgetMovable | QtWidgets.QDockWidget.DockWidgetFloatable)
         parameters_dock.setWidget(self.parameter_tree)
-
         self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, parameters_dock)
         self.setCentralWidget(self.plot_widget)
         self.update_frequency_response()
@@ -279,25 +282,25 @@ class BiquadDesigner(QtGui.QMainWindow):
             self.update_frequency_response)
 
     def get_main_toolbar(self):
-        toolbar = QtGui.QToolBar("Main toolbar")
+        toolbar = QtWidgets.QToolBar("Main toolbar")
 
-        open_button = QtGui.QAction("Open", self)
+        open_button = QtWidgets.QAction("Open", self)
         open_button.triggered.connect(self.reload_state)
         toolbar.addAction(open_button)
 
-        save_button = QtGui.QAction("Save", self)
+        save_button = QtWidgets.QAction("Save", self)
         save_button.triggered.connect(self.save_state)
         toolbar.addAction(save_button)
 
-        load_data_button = QtGui.QAction("Load data", self)
+        load_data_button = QtWidgets.QAction("Load data", self)
         load_data_button.triggered.connect(self.load_data_triggered)
         toolbar.addAction(load_data_button)
 
-        save_button = QtGui.QAction("Save SOS", self)
+        save_button = QtWidgets.QAction("Save SOS", self)
         save_button.triggered.connect(self.save_sos_coefficients)
         toolbar.addAction(save_button)
 
-        refresh_button = QtGui.QAction("Refresh", self)
+        refresh_button = QtWidgets.QAction("Refresh", self)
         refresh_button.triggered.connect(self.update_frequency_response)
         toolbar.addAction(refresh_button)
         return toolbar
@@ -353,8 +356,8 @@ class BiquadDesigner(QtGui.QMainWindow):
                                                                     header="# Second order secions coefficients"),
             "Textproto (*.textproto)": textproto_sos_save,
         }
-        sos_filename, file_type = QtGui.QFileDialog.getSaveFileName(self, 'Save SOS',
-                                                                    self.last_folder, ';;'.join(filters.keys()))
+        sos_filename, file_type = QtWidgets.QFileDialog.getSaveFileName(self, 'Save SOS',
+                                                                        self.last_folder, ';;'.join(filters.keys()))
         self.update_last_folder(sos_filename)
         if sos_filename == "":
             return
