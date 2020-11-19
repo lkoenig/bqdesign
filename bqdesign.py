@@ -13,6 +13,8 @@ import pyqtgraph
 from pyqtgraph.Qt import QtCore, QtGui
 from scipy import signal
 
+
+from data_curve_widget import DataCurveListWidget
 from biquad_design import BIQUAD_DESIGN_LIBRARY
 
 
@@ -274,6 +276,14 @@ class BiquadDesigner(QtGui.QMainWindow):
             QtWidgets.QDockWidget.DockWidgetMovable | QtWidgets.QDockWidget.DockWidgetFloatable)
         parameters_dock.setWidget(self.parameter_tree)
         self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, parameters_dock)
+
+        curve_widget = DataCurveListWidget(self.plot)
+        curve_dock = QtGui.QDockWidget("Curves", parent=self)
+        curve_dock.setFeatures(
+            QtWidgets.QDockWidget.DockWidgetMovable | QtWidgets.QDockWidget.DockWidgetFloatable)
+        curve_dock.setWidget(curve_widget)
+        self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, curve_dock)
+
         self.setCentralWidget(self.plot_widget)
         self.update_frequency_response()
         self.resize(800, 800)
@@ -291,10 +301,6 @@ class BiquadDesigner(QtGui.QMainWindow):
         save_button = QtWidgets.QAction("Save", self)
         save_button.triggered.connect(self.save_state)
         toolbar.addAction(save_button)
-
-        load_data_button = QtWidgets.QAction("Load data", self)
-        load_data_button.triggered.connect(self.load_data_triggered)
-        toolbar.addAction(load_data_button)
 
         save_button = QtWidgets.QAction("Save SOS", self)
         save_button.triggered.connect(self.save_sos_coefficients)
@@ -329,18 +335,6 @@ class BiquadDesigner(QtGui.QMainWindow):
 
     def update_last_folder(self, filename):
         self.last_folder = os.path.dirname(filename)
-
-    def load_data_triggered(self):
-        data_filename, file_type = QtGui.QFileDialog.getOpenFileName(self, 'Open file',
-                                                                     self.last_folder, "Data files (*.csv *.txt)")
-        if data_filename == "":
-            return
-        self.update_last_folder(data_filename)
-        data = np.loadtxt(data_filename)
-        if data.shape[1] == 2:
-            self.plot.plot(x=data[:, 0], y=data[:, 1],
-                           name=str(os.path.basename(data_filename)),
-                           pen=self.get_next_pen())
 
     def save_sos_coefficients(self):
         def textproto_sos_save(filename, data):
